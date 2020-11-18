@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import librosa.display
 import numpy as np
 import librosa
+from tqdm import tqdm
 
 
 def get_random_wave(frequency, sr=8000):
@@ -32,24 +33,58 @@ def get_random_wave(frequency, sr=8000):
     return y
 
 
-def mel1(y, sr=8000):
-    y = y[:sr*2]
+def get_y(sr=8000):
     y11 = get_random_wave(1024, sr=sr)
     y12 = get_random_wave(3000, sr=sr)
-    y1 = y11+y12
-    y21 = get_random_wave(512, sr=sr)
-    y22 = get_random_wave(1500, sr=sr)
+    y1 = y11 + y12
+    y21 = get_random_wave(1023, sr=sr)
+    y22 = get_random_wave(3001, sr=sr)
     y2 = y21 + y22
     y = np.concatenate((y1, y2))
-    # 提取 mel spectrogram feature
-    melspec = librosa.stft(y, n_fft=1024, hop_length=512)
+    return y
 
-    # melspec = librosa.feature.melspectrogram(y1, sr, n_fft=1024, hop_length=512, n_mels=2048)
-    logmelspec = librosa.power_to_db(melspec)  # 转换为对数刻度
+
+def get_y1(sr=8000):
+    y = np.zeros_like(get_random_wave(1024, sr=sr))
+    for i in tqdm(np.arange(1, 5000, 2)):
+        y += get_random_wave(i, sr=sr)/i
+    return y
+
+
+def get_y2(*frequencys, sr=8000):
+    y = get_random_wave(0, sr=sr)
+    for frequency in frequencys:
+        y += get_random_wave(frequency, sr=sr)
+    return y
+
+
+def mel1(y, sr=8000):
+    # sr = 120000
+    y = y[:sr * 100]
+    # y = get_y2(100, 1000, 10000, sr=sr)
+    plt.plot(np.linspace(0, 2, len(y))[:1000], y[:1000])
+    plt.show()
+    # 提取 mel spectrogram feature
+
+    n_fft = 1024
+    hop_length = 512
+    win_length = None
+    power = 1.0
+    n_mels = 40
+    # 直接调用函数计算梅尔频谱
+    melspec1 = librosa.feature.melspectrogram(y, sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, win_length=win_length, power=power)
+    # 自行计算梅尔频谱
+    spec = librosa.stft(y, n_fft=n_fft, hop_length=512, win_length=win_length)
+    amplitude_spec = np.abs(spec) ** power
+    #   构建梅尔滤波器
+    mel_basis = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=0., fmax=60000)
+    melspec2 = np.dot(mel_basis, amplitude_spec)
+
+    logmelspec = librosa.power_to_db(melspec2, top_db=80)  # 转换为对数刻度
     # 绘制 mel 频谱图
     plt.figure()
-    librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
-    # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='mel')
+    # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
+    librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='mel')
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
     plt.title('Beat wavform')
     plt.show()
