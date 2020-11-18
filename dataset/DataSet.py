@@ -179,6 +179,24 @@ class DataSet(Vad, Audio):
         audio = self.spectrogramToAudio(spec, phase=phase, frame_len=frame_len)
         return audio, spec
 
+    def test(self):
+        root = r"E:\DATA\坐席辅助项目\坐席辅助公积金的录音下载文件\录音下载"
+        # audio_file = os.path.join(root, "8679594520200915122118_18285386619.wav")
+        audio_file = r"E:\PycharmProjects\AudioDataProcessing\audio\cafe.wav"
+        # 读取wav文件
+        nchannels1, sampwidth1, framerate1, nframes1, x_train_wave = self.readWavFile(audio_file)
+        # 将声波转为矩阵
+        x_train_matrix = self.piecewise((nchannels1, sampwidth1, framerate1, nframes1, x_train_wave),
+                                        winfunc=self.princen_bradley)
+        # 将转为矩阵的声波转为语谱图
+        x_train_amp_spec, x_train_spec, phase_x = self.audioToSpectrogram(x_train_matrix, n=2000)
+        # 将语谱振幅图转为倒谱图
+        x_ceps, x_one_derived, x_two_derived = self.spectrogramToCepstrum(x_train_amp_spec, n_derived=2)
+
+        x_ceps2 = (x_ceps - np.mean(x_ceps)) / np.std(x_ceps)
+        x_ceps3 = x_ceps2 * np.std(x_ceps2) + np.mean(x_ceps2)
+
+
 
 if __name__ == "__main__":
     # wavPath = "../resources/data/"
@@ -193,7 +211,10 @@ if __name__ == "__main__":
 
     merge_noise = "D:/BaiduNetdiskDownload/声音数据/test_noise/0db"
 
-    dataset = DataSet(denoise_all, noise, merge_noise)
-    dataset.princen_bradley(100)
-    dataset.build()
+    # dataset = DataSet(denoise_all, noise, merge_noise)
+    dataset = DataSet()
+    # dataset.princen_bradley(100)
+    # dataset.build()
+    dataset.test()
+
     print()
