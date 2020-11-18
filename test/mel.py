@@ -59,9 +59,9 @@ def get_y2(*frequencys, sr=8000):
 
 
 def mel1(y, sr=8000):
-    # sr = 120000
-    y = y[:sr * 10]
-    # y = get_y2(500, 1000, 2000, 3000, 4000, sr=sr)
+    sr = 120000
+    # y = y[:sr * 50]
+    y = get_y2(500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500,9000, 10000, 20000, 30000, 40000, 50000, sr=sr)
     # plt.plot(np.linspace(0, 2, len(y))[:1000], y[:1000])
     # plt.show()
     # 提取 mel spectrogram feature
@@ -72,11 +72,13 @@ def mel1(y, sr=8000):
     power = 1.0
     n_mels = 40
     fmin = 0.
-    fmax = None
+    fmax = sr/2
+    if fmax is None:
+        fmax = float(sr) / 2
     # 直接调用函数计算梅尔频谱
     melspec1 = librosa.feature.melspectrogram(y, sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, win_length=win_length, power=power, fmin=fmin, fmax=fmax)
     # 自行计算梅尔频谱
-    spec = librosa.stft(y, n_fft=n_fft, hop_length=512, win_length=win_length)
+    spec = librosa.stft(y, n_fft=n_fft, hop_length=512, win_length=win_length, center=True)
     amplitude_spec = np.abs(spec) ** power
     #   构建梅尔滤波器
     mel_basis = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax)
@@ -87,13 +89,12 @@ def mel1(y, sr=8000):
     logmelspec2 = librosa.power_to_db(melspec2, top_db=80)  # 转换为对数刻度
 
     plt.figure()
-    librosa.display.specshow(logmelspec0, sr=sr, hop_length=hop_length, x_axis='time', y_axis='hz', fmin=fmin, fmax=fmax)
+    librosa.display.specshow(logmelspec0, sr=sr, hop_length=hop_length, x_axis='time', y_axis='hz')
     # librosa.display.specshow(logmelspec0, sr=sr, x_axis='time', y_axis='mel')
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
     plt.title('spec')
     plt.show()
 
-    fmax = 4000
     # 绘制 mel 频谱图
     plt.figure()
     # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
