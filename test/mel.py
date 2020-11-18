@@ -61,7 +61,7 @@ def get_y2(*frequencys, sr=8000):
 def mel1(y, sr=8000):
     # sr = 120000
     y = y[:sr * 10]
-    # y = get_y2(100, 1000, 10000, sr=sr)
+    # y = get_y2(500, 1000, 2000, 3000, 4000, sr=sr)
     # plt.plot(np.linspace(0, 2, len(y))[:1000], y[:1000])
     # plt.show()
     # 提取 mel spectrogram feature
@@ -87,25 +87,26 @@ def mel1(y, sr=8000):
     logmelspec2 = librosa.power_to_db(melspec2, top_db=80)  # 转换为对数刻度
 
     plt.figure()
-    librosa.display.specshow(logmelspec0, sr=sr, x_axis='time', y_axis='hz')
+    librosa.display.specshow(logmelspec0, sr=sr, hop_length=hop_length, x_axis='time', y_axis='hz', fmin=fmin, fmax=fmax)
     # librosa.display.specshow(logmelspec0, sr=sr, x_axis='time', y_axis='mel')
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
-    plt.title('Beat wavform')
+    plt.title('spec')
     plt.show()
 
+    fmax = 4000
     # 绘制 mel 频谱图
     plt.figure()
     # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
-    librosa.display.specshow(logmelspec1, sr=sr, x_axis='time', y_axis='mel')
+    librosa.display.specshow(melspec1, sr=sr, hop_length=hop_length, x_axis='time', y_axis='mel', fmin=fmin, fmax=fmax)
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
-    plt.title('Beat wavform')
+    plt.title('melspec1')
     plt.show()
 
     plt.figure()
     # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
-    librosa.display.specshow(logmelspec2, sr=sr, x_axis='time', y_axis='mel')
+    librosa.display.specshow(logmelspec2, sr=sr, hop_length=hop_length, x_axis='time', y_axis='mel', fmin=fmin, fmax=fmax)
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
-    plt.title('Beat wavform')
+    plt.title('melspec2')
     plt.show()
 
 
@@ -120,6 +121,7 @@ def mel2(y):
 
 if __name__ == '__main__':
     root = r"E:\DATA\坐席辅助项目\坐席辅助公积金的录音下载文件\录音下载"
-    audio_file = os.path.join(root, "8679594520200915122118_18285386619.wav")
+    root = r"/home/wcirq/Music"
+    audio_file = os.path.join(root, "苏晗 - 没人再回来.flac")
     audio_datas, sr = librosa.load(audio_file, sr=8000)
     mel1(audio_datas, sr)
