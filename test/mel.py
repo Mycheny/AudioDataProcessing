@@ -60,10 +60,10 @@ def get_y2(*frequencys, sr=8000):
 
 def mel1(y, sr=8000):
     # sr = 120000
-    y = y[:sr * 100]
+    y = y[:sr * 10]
     # y = get_y2(100, 1000, 10000, sr=sr)
-    plt.plot(np.linspace(0, 2, len(y))[:1000], y[:1000])
-    plt.show()
+    # plt.plot(np.linspace(0, 2, len(y))[:1000], y[:1000])
+    # plt.show()
     # 提取 mel spectrogram feature
 
     n_fft = 1024
@@ -71,20 +71,39 @@ def mel1(y, sr=8000):
     win_length = None
     power = 1.0
     n_mels = 40
+    fmin = 0.
+    fmax = None
     # 直接调用函数计算梅尔频谱
-    melspec1 = librosa.feature.melspectrogram(y, sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, win_length=win_length, power=power)
+    melspec1 = librosa.feature.melspectrogram(y, sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, win_length=win_length, power=power, fmin=fmin, fmax=fmax)
     # 自行计算梅尔频谱
     spec = librosa.stft(y, n_fft=n_fft, hop_length=512, win_length=win_length)
     amplitude_spec = np.abs(spec) ** power
     #   构建梅尔滤波器
-    mel_basis = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=0., fmax=60000)
+    mel_basis = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax)
     melspec2 = np.dot(mel_basis, amplitude_spec)
 
-    logmelspec = librosa.power_to_db(melspec2, top_db=80)  # 转换为对数刻度
+    logmelspec0 = librosa.power_to_db(amplitude_spec, top_db=80)  # 转换为对数刻度
+    logmelspec1 = librosa.power_to_db(melspec1, top_db=80)  # 转换为对数刻度
+    logmelspec2 = librosa.power_to_db(melspec2, top_db=80)  # 转换为对数刻度
+
+    plt.figure()
+    librosa.display.specshow(logmelspec0, sr=sr, x_axis='time', y_axis='hz')
+    # librosa.display.specshow(logmelspec0, sr=sr, x_axis='time', y_axis='mel')
+    plt.colorbar(format='%+2.0f dB')  # 右边的色度条
+    plt.title('Beat wavform')
+    plt.show()
+
     # 绘制 mel 频谱图
     plt.figure()
     # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
-    librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='mel')
+    librosa.display.specshow(logmelspec1, sr=sr, x_axis='time', y_axis='mel')
+    plt.colorbar(format='%+2.0f dB')  # 右边的色度条
+    plt.title('Beat wavform')
+    plt.show()
+
+    plt.figure()
+    # librosa.display.specshow(logmelspec, sr=sr, x_axis='time', y_axis='hz')
+    librosa.display.specshow(logmelspec2, sr=sr, x_axis='time', y_axis='mel')
     plt.colorbar(format='%+2.0f dB')  # 右边的色度条
     plt.title('Beat wavform')
     plt.show()
