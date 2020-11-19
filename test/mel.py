@@ -25,7 +25,7 @@ def get_random_wave(frequency, sr=8000, amplitude=1, initial_phase=0, show_T=1):
     sampling_rate = sr  # 一个周期采样数（采样率）
     sample = sampling_rate * show_T  # 总采样数
     if frequency == 0:
-        return np.array([amplitude]*(sample-1), np.float64)
+        return np.array([amplitude] * (sample - 1), np.float64)
     angular_frequency = 2 * np.pi * frequency  # 角频率
     t = np.linspace(0, show_T, sample)  # 时间数组
     t = t[:-1]  # t[-1] 是另一个周期的起点需要去掉
@@ -156,7 +156,11 @@ def mel2(y):
 def fft():
     sr = 768
     # y = get_y2(100, 200, 300, sr=sr)
-    y = get_y3([0, 50, 75], sr=sr, amplitude=[2, 3, 1.5], initial_phase=[0*np.pi/180, -30*np.pi/180, 90*np.pi/180])
+    y = get_y3([0, 50, 75], sr=sr, amplitude=[2, 3, 1.5],
+               initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
+    t = np.linspace(0, 1, len(y))
+    plt.plot(t, y)
+    plt.show()
     f = np.fft.fft(y)
     freal = f.real
     fimag = f.imag
@@ -164,14 +168,15 @@ def fft():
     phase = np.angle(f)  # 相位
     phase1 = np.arctan2(fimag, freal)
     Fn = np.arange(0, len(y)) * sr / len(y)  # 某点n所表示的频率
-    t = np.linspace(0, 1, len(y))
     y_amplitude = np.concatenate(((norm / len(y))[:1], (norm / (len(y) / 2))[1:]))
-    angle = phase*180/np.pi
-    angle1 = phase1*180/np.pi
-    for i in [0, 50, 75]:
+    angle = phase * 180 / np.pi
+    angle1 = phase1 * 180 / np.pi
+    Y = np.zeros_like(y)
+    for i in [0, 1, 50, 75]:
         #  频率为i的波形
         y_ = y_amplitude[i] * np.cos(2 * np.pi * Fn[i] * t + phase[i])
-        plt.plot(t, y_)
+        Y += y_
+        plt.plot(t, Y)
         plt.show()
     print()
 
