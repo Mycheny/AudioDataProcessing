@@ -178,6 +178,10 @@ def fft():
         Y += y_
         plt.plot(t, Y)
         plt.show()
+    y1 = np.fft.ifft(norm)
+    y1_abs = np.abs(y1)
+    plt.plot(t, y1_abs)
+    plt.show()
     print()
 
 
