@@ -172,13 +172,14 @@ def fft():
     angle = phase * 180 / np.pi
     angle1 = phase1 * 180 / np.pi
     Y = np.zeros_like(y)
-    for i in [0, 1, 50, 75]:
-        #  频率为i的波形
-        y_ = y_amplitude[i] * np.cos(2 * np.pi * Fn[i] * t + phase[i])
-        Y += y_
-        plt.plot(t, Y)
-        plt.show()
-    y1 = np.fft.ifft(norm)
+    # for i in [0, 1, 50, 75]:
+    #      频率为i的波形
+        # y_ = y_amplitude[i] * np.cos(2 * np.pi * Fn[i] * t + phase[i])
+        # Y += y_
+        # plt.plot(t, Y)
+        # plt.show()
+    norm_shift = np.fft.fftshift(f)
+    y1 = np.fft.ifft(norm_shift)
     y1_abs = np.abs(y1)
     plt.plot(t, y1_abs)
     plt.show()
@@ -187,8 +188,8 @@ def fft():
 
 if __name__ == '__main__':
     root = r"E:\DATA\坐席辅助项目\坐席辅助公积金的录音下载文件\录音下载"
-    # root = r"/home/wcirq/Music"
-    # audio_file = os.path.join(root, "8679592520200924155041_18786077690.wav")
+    root = r"/home/wcirq/Music"
+    audio_file = os.path.join(root, "苏晗 - 没人再回来.flac")
     # audio_datas, sr = librosa.load(audio_file, sr=8000)
     # mel1(audio_datas, sr)
     fft()

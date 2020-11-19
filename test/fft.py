@@ -8,12 +8,12 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
-if __name__ == '__main__':
+def main1():
     img = cv2.imread('src.jpg', 0)
     f = np.fft.fft2(img)  # 傅里叶变换得到频谱，一般来说，低频分量模值最大
     fshift = np.fft.fftshift(f)  # 平移频谱到图像中央
     fshift = np.fft.ifftshift(fshift)  # 平移频谱到图像中央
-    fshift = fshift+np.random.random(fshift.shape)
+    fshift = fshift + np.random.random(fshift.shape)
     # 将频谱转换成db
     magnitude_spectrum = 20 * np.log(np.abs(fshift))
     plt.subplot(321)
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     rows, cols = img.shape
     crow, ccol = rows // 2, cols // 2
     # 将低频区去掉一部分，只剩下高频区， 换源出来的就只剩下轮廓（高频信号）
-    region = int((ccol+crow)/4)
+    region = int((ccol + crow) / 4)
     # fshift[crow - region:crow + region, ccol - region:ccol + region] = 0
     # 平移逆变换
     f_ishift = np.fft.ifftshift(fshift)
@@ -64,3 +64,42 @@ if __name__ == '__main__':
     plt.subplot(122), plt.imshow(magnitude_spectrum, cmap='gray')
     plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
     plt.show()
+
+
+def main2():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    fs = 10
+    ts = 1 / fs
+    t = np.arange(-5, 5, ts)  # 生成时间序列，采样间隔0.1s
+    k = np.arange(t.size)  # DFT的自变量
+    N = t.size  # DFT的点数量
+    x = np.zeros_like(t)  # 生成一个与t相同结构，内容为0的np.array
+    x[40:60] = 1  # 设置信号的方波，范围是40-60
+    f = np.fft.fft(x)
+    y = np.fft.fftshift(f)  # 先np.fft.fft进行fft计算，这时的y是【0,fs】频率相对应的
+    # 调用np.fft.fftshift将y变为与频率范围【-fs/2,fs/2】对应，就是将大于fs/2的部分放到
+    # -fs/2到0之间,然后绘图的时候将用频率是f=(k*fs/N-fs/2),将频率变为【-fs/2,fs/2】之间
+    yf = np.abs(y)  # 计算频率域的振幅
+    # plt.rcParams["font.sans - serif"]=["SimHei"]  # 中文乱码处理
+    plt.rcParams["axes.unicode_minus"]=False
+    plt.subplot(311)
+    plt.plot(t, x)
+    plt.title("原始方波信号")
+    plt.legend(("采样频率fs=10"))
+    plt.subplot(312)
+    plt.title("方波信号经过fft变换后的频谱")
+    f = fs * k / N - fs / 2  # 计算频率
+    plt.plot(f, yf)
+    iy = np.abs(np.fft.ifft(y))  # 注意这里进行ifft的y要是fft计算出的y经过np.fft.fftshift的
+    # 否则会显示错误的结果,y是没有经过np.abs的，y是个复数，计算结果iy是个实数
+    plt.subplot(313)
+    plt.title("方波fft的ifft")
+    plt.plot(t, iy)
+    plt.tight_layout()  # 显示完整图片
+    plt.show()
+    plt.close()
+
+
+if __name__ == '__main__':
+   main2()
