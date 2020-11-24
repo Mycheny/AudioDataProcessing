@@ -81,7 +81,7 @@ def get_y3(frequencys: list, sr=8000, amplitude=None, initial_phase=None, show_T
     if amplitude is None:
         amplitude = [1] * len(frequencys)
     if initial_phase is None:
-        initial_phase = [1] * len(frequencys)
+        initial_phase = [0] * len(frequencys)
     y = np.zeros_like(get_random_wave(0, sr=sr))
     for i, frequency in enumerate(frequencys):
         y += get_random_wave(frequency, sr=sr, amplitude=amplitude[i], initial_phase=initial_phase[i], show_T=show_T)
@@ -165,7 +165,7 @@ def fft():
     freal = f.real
     fimag = f.imag
     norm = np.abs(f)  # 模
-    phase = np.angle(f)  # 相位
+    phase = np.angle(f)  # 初相
     phase1 = np.arctan2(fimag, freal)
     Fn = np.arange(0, len(y)) * sr / len(y)  # 某点n所表示的频率
     y_amplitude = np.concatenate(((norm / len(y))[:1], (norm / (len(y) / 2))[1:]))
@@ -177,10 +177,11 @@ def fft():
     axes[0].set_xlabel("time (s)")
     axes[0].set_ylabel("signal")
     axes[0].set_xlim(0, 0.3)
+    axes[0].legend()
     Y = np.zeros_like(y)
     label = ""
     for i, frequency in enumerate([0, 1, 50, 75]):
-        label+=str(i)
+        label+=f"{str(frequency)} "
          # 频率为i的波形
         y_ = y_amplitude[frequency] * np.cos(2 * np.pi * Fn[frequency] * t + phase[frequency])
         Y += y_
@@ -195,7 +196,10 @@ def fft():
     y1_real = y1.real
     y1_imag = y1.imag
     axes[5].plot(t, y1_real+y1_imag, color="blue", lw=2, label=f"还原的波形")
+    axes[0].set_xlabel("time (s)")
+    axes[0].set_ylabel("signal")
     axes[5].set_xlim(0, 0.3)
+    axes[5].legend()
     plt.show()
     print()
 
