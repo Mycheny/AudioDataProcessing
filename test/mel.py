@@ -10,6 +10,8 @@ import librosa.display
 import numpy as np
 import librosa
 from tqdm import tqdm
+from pylab import mpl
+mpl.rcParams["font.sans-serif"] = ["SimHei"]
 
 
 def get_random_wave(frequency, sr=8000, amplitude=1, initial_phase=0, show_T=1):
@@ -159,8 +161,6 @@ def fft():
     y = get_y3([0, 50, 75], sr=sr, amplitude=[2, 3, 1.5],
                initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
     t = np.linspace(0, 1, len(y))
-    plt.plot(t, y)
-    plt.show()
     f = np.fft.fft(y)
     freal = f.real
     fimag = f.imag
@@ -171,19 +171,31 @@ def fft():
     y_amplitude = np.concatenate(((norm / len(y))[:1], (norm / (len(y) / 2))[1:]))
     angle = phase * 180 / np.pi
     angle1 = phase1 * 180 / np.pi
+
+    fig, axes = plt.subplots(6, 1, figsize=(8, 18))
+    axes[0].plot(t, y, label="原始波形")
+    axes[0].set_xlabel("time (s)")
+    axes[0].set_ylabel("signal")
+    axes[0].set_xlim(0, 0.3)
     Y = np.zeros_like(y)
-    # for i in [0, 1, 50, 75]:
-    #      频率为i的波形
-        # y_ = y_amplitude[i] * np.cos(2 * np.pi * Fn[i] * t + phase[i])
-        # Y += y_
-        # plt.plot(t, Y)
-        # plt.show()
+    label = ""
+    for i, frequency in enumerate([0, 1, 50, 75]):
+        label+=str(i)
+         # 频率为i的波形
+        y_ = y_amplitude[frequency] * np.cos(2 * np.pi * Fn[frequency] * t + phase[frequency])
+        Y += y_
+        axes[i+1].plot(t, Y, color="green", lw=2, label=f"{label}的波形")
+        axes[i+1].set_xlabel("time (s)")
+        axes[i+1].set_ylabel("signal")
+        axes[i+1].legend()
+        axes[i+1].set_xlim(0, 0.3)
     norm_shift = np.fft.fftshift(f)
     y1 = np.fft.ifft(f)
     y1_abs = np.abs(y1)
     y1_real = y1.real
     y1_imag = y1.imag
-    plt.plot(t, y1_real+y1_imag)
+    axes[5].plot(t, y1_real+y1_imag, color="blue", lw=2, label=f"还原的波形")
+    axes[5].set_xlim(0, 0.3)
     plt.show()
     print()
 
