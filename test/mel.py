@@ -179,9 +179,11 @@ def fft():
         # plt.plot(t, Y)
         # plt.show()
     norm_shift = np.fft.fftshift(f)
-    y1 = np.fft.ifft(norm_shift)
+    y1 = np.fft.ifft(f)
     y1_abs = np.abs(y1)
-    plt.plot(t, y1_abs)
+    y1_real = y1.real
+    y1_imag = y1.imag
+    plt.plot(t, y1_real+y1_imag)
     plt.show()
     print()
 
