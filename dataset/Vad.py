@@ -9,7 +9,7 @@ from util.config import logger
 class Vad(ReadWav):
     def __init__(self):
         super().__init__()
-        self.frame_time = 10  # 多少ms一帧(ms)
+        self.frame_time = 1000  # 多少ms一帧(ms)
         self.frame_step = self.frame_time/2  # 帧的步长
 
         # 初始短时能量高门限

@@ -169,6 +169,7 @@ def fft():
     phase1 = np.arctan2(fimag, freal)
     Fn = np.arange(0, len(y)) * sr / len(y)  # 某点n所表示的频率
     y_amplitude = np.concatenate(((norm / len(y))[:1], (norm / (len(y) / 2))[1:]))
+    y_amplitude1 = (np.abs(np.fft.fft(y, n=767 * 6)) / (767 / 2))[50 * 6]
     angle = phase * 180 / np.pi
     angle1 = phase1 * 180 / np.pi
 

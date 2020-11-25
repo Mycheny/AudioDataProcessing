@@ -107,16 +107,30 @@ class Audio(object):
 
         return mfcc_feat, one_derived, two_derived
 
-    def audioToSpectrogram(self, frames, n=2000):
+    def audioToSpectrogram(self, frames, n=None):
         """
         音频信号转为语谱图
         :param n:
         :param frames:
         :return:
         """
-        complex_spectrum = np.fft.rfft(frames, n=n * 2)
+        complex_spectrum = np.fft.rfft(frames, n=None)
         amp_spectrum = np.absolute(complex_spectrum)
+        amp_spectrum = np.concatenate(((amp_spectrum / frames.shape[1])[:, :1],
+                                       (amp_spectrum / (frames.shape[1] / 2))[:, 1:]), axis=1)
         phase = np.angle(complex_spectrum)
+
+        Y = np.zeros((11026*2-2,))
+        for i, frequency in enumerate(range(11026)):
+            y_ = amp_spectrum[33][frequency] * np.cos(
+                2 * np.pi * np.arange(0, 11026)[frequency] * np.linspace(0, 1, 11026*2-2) + phase[33][frequency])
+            Y += y_
+
+        a = frames[33, :]-Y
+        plt.plot(Y)
+        plt.plot(frames[33, :])
+        plt.show()
+
         spec = np.log1p(amp_spectrum)
         return amp_spectrum, spec, phase
 
