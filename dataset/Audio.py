@@ -1,4 +1,5 @@
 import re
+import time
 
 import cv2
 import librosa
@@ -6,6 +7,52 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fftpack import dct, idct
 import pyaudio
+from pylab import mpl
+
+mpl.rcParams["font.sans-serif"] = ["SimHei"]
+
+
+def get_random_wave(frequency, sr=8000, amplitude=1, initial_phase=0, show_T=1):
+    """
+    返回对应频率的二维波形
+    :param sr: 采样率
+    :param frequency: 频率
+    :param initial_phase: 初相
+    :param amplitude: 振幅
+    :param show_T: 显示多少秒对应频率的波形
+    :return:
+    """
+    sampling_rate = sr  # 一个周期采样数（采样率）
+    sample = sampling_rate * show_T  # 总采样数
+    if frequency == 0:
+        return np.array([amplitude] * (sample - 1), np.float64)
+    angular_frequency = 2 * np.pi * frequency  # 角频率
+    t = np.linspace(0, show_T, sample)  # 时间数组
+    t = t[:-1]  # t[-1] 是另一个周期的起点需要去掉
+    y = amplitude * np.cos(angular_frequency * t + initial_phase)
+    # plt.plot(t, y)
+    # plt.show()
+    return y
+
+
+def get_y3(frequencys: list, sr=8000, amplitude=None, initial_phase=None, show_T=1):
+    """
+    获取多个频率组合成的一维信号
+    :param frequencys: 需要的频率数组
+    :param sr: 采样率
+    :param amplitude:
+    :param initial_phase:
+    :param show_T:
+    :return: 多个频率组合成的一维信号
+    """
+    if amplitude is None:
+        amplitude = [1] * len(frequencys)
+    if initial_phase is None:
+        initial_phase = [0] * len(frequencys)
+    y = np.zeros_like(get_random_wave(0, sr=sr))
+    for i, frequency in enumerate(frequencys):
+        y += get_random_wave(frequency, sr=sr, amplitude=amplitude[i], initial_phase=initial_phase[i], show_T=show_T)
+    return y
 
 
 class Audio(object):
@@ -107,6 +154,45 @@ class Audio(object):
 
         return mfcc_feat, one_derived, two_derived
 
+    def refactor_signal(self, frames):
+        frames = get_y3([0, 50, 75], sr=200, amplitude=[2, 3, 1.5], initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
+        frames = np.tile(frames.reshape((1, -1)), [10, 1])
+        spectrogram = np.fft.fft(frames, n=None)
+        amp_spectrum = np.absolute(spectrogram)
+        amp_spectrum = np.concatenate(((amp_spectrum / frames.shape[1])[:, :1],
+                                       (amp_spectrum / (frames.shape[1] / 2))[:, 1:]), axis=1)
+        phase = np.angle(spectrogram)
+        frame_num, max_frequency = amp_spectrum.shape
+        frame_num, frame_len = frames.shape
+        recovery_frames = np.zeros_like(frames)
+        recovery_frames1 = np.zeros_like(frames)
+        ts = np.linspace(0, 1, frame_len)
+        fig, axes = plt.subplots(25, 1, figsize=(8, 25 * 3))
+        for num in range(1, 5):
+            s = time.time()
+            for i, frequency in enumerate(range(max_frequency)):
+                y_ = amp_spectrum[num][frequency] * np.cos(2 * np.pi * frequency * ts + phase[num][frequency])
+                recovery_frames[num] += y_
+                g = 8
+                if i % g == 0:
+                    diff = np.mean(np.abs(recovery_frames[num]-frames[num]))*1000
+                    axes[i // g].plot(ts[:100], frames[num][:100], label=f"原始波形{diff}")
+                    axes[i // g].plot(ts[:100], recovery_frames[num][:100], label=f"还原波形{frequency}")
+                    axes[i // g].legend()
+            plt.show()
+            e = time.time()
+            print(e - s)
+            # recovery_frames1[num] = np.sum(amp_spectrum[num].reshape((1, -1)) * np.cos(
+            #     2 * np.pi * np.arange(0, int(max_frequency/2)).reshape((1, -1)) * ts.reshape((-1, 1)) + phase[num].reshape(
+            #         (1, -1))), axis=1)
+            print(time.time() - e)
+            plt.plot(recovery_frames[num][:100], lw=4, color="red")
+            # plt.plot(recovery_frames1[num][:100], lw=2, color="green")
+            plt.plot(frames[num][:100], lw=1)
+            plt.show()
+        print(" dsdsdsdsd")
+        a = frames - recovery_frames
+
     def audioToSpectrogram(self, frames, n=None):
         """
         音频信号转为语谱图
@@ -120,16 +206,7 @@ class Audio(object):
                                        (amp_spectrum / (frames.shape[1] / 2))[:, 1:]), axis=1)
         phase = np.angle(complex_spectrum)
 
-        Y = np.zeros((11026*2-2,))
-        for i, frequency in enumerate(range(11026)):
-            y_ = amp_spectrum[33][frequency] * np.cos(
-                2 * np.pi * np.arange(0, 11026)[frequency] * np.linspace(0, 1, 11026*2-2) + phase[33][frequency])
-            Y += y_
-
-        a = frames[33, :]-Y
-        plt.plot(Y)
-        plt.plot(frames[33, :])
-        plt.show()
+        signal = self.refactor_signal(frames)
 
         spec = np.log1p(amp_spectrum)
         return amp_spectrum, spec, phase
