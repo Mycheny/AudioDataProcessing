@@ -6,7 +6,55 @@
 # @Site
 import math
 import wave
+import cv2
 import numpy as np
+from pylab import mpl
+
+
+mpl.rcParams["font.sans-serif"] = ["SimHei"]
+
+
+def get_random_wave(frequency, sr=8000, amplitude=1, initial_phase=0, show_T=1):
+    """
+    返回对应频率的二维波形
+    :param sr: 采样率
+    :param frequency: 频率
+    :param initial_phase: 初相
+    :param amplitude: 振幅
+    :param show_T: 显示多少秒对应频率的波形
+    :return:
+    """
+    sampling_rate = sr  # 一个周期采样数（采样率）
+    sample = sampling_rate * show_T  # 总采样数
+    if frequency == 0:
+        return np.array([amplitude] * (sample - 1), np.float64)
+    angular_frequency = 2 * np.pi * frequency  # 角频率
+    t = np.linspace(0, show_T, sample)  # 时间数组
+    t = t[:-1]  # t[-1] 是另一个周期的起点需要去掉
+    y = amplitude * np.cos(angular_frequency * t + initial_phase)
+    # plt.plot(t, y)
+    # plt.show()
+    return y
+
+
+def get_y3(frequencys: list, sr=8000, amplitude=None, initial_phase=None, show_T=1):
+    """
+    获取多个频率组合成的一维信号
+    :param frequencys: 需要的频率数组
+    :param sr: 采样率
+    :param amplitude:
+    :param initial_phase:
+    :param show_T:
+    :return: 多个频率组合成的一维信号
+    """
+    if amplitude is None:
+        amplitude = [1] * len(frequencys)
+    if initial_phase is None:
+        initial_phase = [0] * len(frequencys)
+    y = np.zeros_like(get_random_wave(0, sr=sr))
+    for i, frequency in enumerate(frequencys):
+        y += get_random_wave(frequency, sr=sr, amplitude=amplitude[i], initial_phase=initial_phase[i], show_T=show_T)
+    return y
 
 
 class AudioDeal():
@@ -57,7 +105,7 @@ class AudioDeal():
 
     def princen_bradley(self, x):
         """princen_bradley加窗函数"""
-        winfunc = np.sin((np.pi/2)*np.power(np.sin(np.pi*np.arange(0, x)/x),2))
+        winfunc = np.sin((np.pi / 2) * np.power(np.sin(np.pi * np.arange(0, x) / x), 2))
         return winfunc
 
     def piecewise(self, speech_signal, sampling_rate=8800, winfunc=lambda x: np.ones((x,))):
@@ -86,14 +134,49 @@ class AudioDeal():
         indices = a + bt  # 相当于对所有帧的时间点进行抽取，得到frames_num*frame_length长度的矩阵
         indices = np.array(indices, dtype=np.int32)  # 将indices转化为矩阵
         frames = pad_signal[indices]  # 得到帧信号
-        win = winfunc(self.frame_length) # window窗函数，这里默认取1
+        win = winfunc(self.frame_length)  # window窗函数，这里默认取1
         frames *= win  # 信号加窗处理
         return frames
 
+    def imshow(self, images, win_name="", delay=0):
+        win_h, win_w = 1366, 746
+        h, w = images.shape
+        if h > win_h or w > win_w:
+            if h > w:
+                h, w = win_h, int(w * win_h / h)
+            else:
+                h, w = int(win_w*w/h), win_w
+        images = cv2.resize(images, (w, h))
+        # images = (images-images.min())/(images.max()-images.min())
+        images = np.log10(np.maximum(1e-10, images))
+        images = (images-images.min())/(images.max()-images.min())
+        cv2.imshow(win_name, images.T)
+        cv2.waitKey(delay=delay)
+
+    def frames_to_spectrogram(self, frames):
+        # frames = get_y3([0, 50, 75], sr=200, amplitude=[2, 3, 1.5],
+        #                 initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
+        # frames = np.tile(frames.reshape((1, -1)), [10, 1])
+        complex_spectrum = np.fft.fft(frames, n=None)  # n默认为frames.shape[-1]，此时结果的索引即对应频率，若n为默认值乘以2，则索引乘以2等于频率
+        amp_spectrum = np.absolute(complex_spectrum)
+        amp_spectrum = np.concatenate(((amp_spectrum / frames.shape[1])[:, :1],
+                                       (amp_spectrum / (frames.shape[1] / 2))[:, 1:]), axis=1)
+        phase = np.angle(complex_spectrum)
+        # 欧拉公式 e^ix = cos(x)+i*sin(x), 因(e^a)*(e^b)=e^(a+b) --> (e^0)*(e^x)=e^(0+x)
+        restore_complex_spectrum = amp_spectrum * np.exp(1j * phase)
+        restore_complex_spectrum2 = amp_spectrum * (np.cos(phase)+1j*np.sin(phase))
+
+        self.imshow(amp_spectrum)
+
+        spec = np.log1p(amp_spectrum)
+        return amp_spectrum, spec, phase
+
 
 if __name__ == '__main__':
-    audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
+    # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
+    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
     audio_deal = AudioDeal()
-    sampling_rate, speech_signal = audio_deal.read_wav(audio_file)
+    sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
+    audio_deal.frames_to_spectrogram(frames)
     print()
