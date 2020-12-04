@@ -190,6 +190,7 @@ class DataSet(Vad, Audio):
                                         winfunc=self.princen_bradley)
         # 将转为矩阵的声波转为语谱图
         x_train_amp_spec, x_train_spec, phase_x = self.audioToSpectrogram(x_train_matrix)
+        self.spectrogramToAudio(x_train_amp_spec, phase_x)
         # 将语谱振幅图转为倒谱图
         x_ceps, x_one_derived, x_two_derived = self.spectrogramToCepstrum(x_train_amp_spec, n_derived=2)
 

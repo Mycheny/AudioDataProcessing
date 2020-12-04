@@ -197,8 +197,8 @@ def fft():
     y1_real = y1.real
     y1_imag = y1.imag
     axes[5].plot(t, y1_real+y1_imag, color="blue", lw=2, label=f"还原的波形")
-    axes[0].set_xlabel("time (s)")
-    axes[0].set_ylabel("signal")
+    axes[5].set_xlabel("time (s)")
+    axes[5].set_ylabel("signal")
     axes[5].set_xlim(0, 0.3)
     axes[5].legend()
     plt.show()
