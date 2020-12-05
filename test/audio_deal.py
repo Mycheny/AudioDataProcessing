@@ -8,8 +8,8 @@ import math
 import wave
 import cv2
 import numpy as np
+import pyaudio
 from pylab import mpl
-
 
 mpl.rcParams["font.sans-serif"] = ["SimHei"]
 
@@ -96,6 +96,9 @@ class AudioDeal():
             wave_data = wave_data[:limit_signal_length]
         if normalization:
             wave_data = wave_data / self.signal_maximum  # 归一化
+        self.sampwidth = sampwidth
+        self.nchannels = nchannels
+        self.sampling_rate = sampling_rate
         return sampling_rate, wave_data
 
     def hanming(self, x):
@@ -145,11 +148,11 @@ class AudioDeal():
             if h > w:
                 h, w = win_h, int(w * win_h / h)
             else:
-                h, w = int(win_w*w/h), win_w
+                h, w = int(win_w * w / h), win_w
         images = cv2.resize(images, (w, h))
         # images = (images-images.min())/(images.max()-images.min())
         images = np.log10(np.maximum(1e-10, images))
-        images = (images-images.min())/(images.max()-images.min())
+        images = (images - images.min()) / (images.max() - images.min())
         cv2.imshow(win_name, images.T)
         cv2.waitKey(delay=delay)
 
@@ -164,19 +167,58 @@ class AudioDeal():
         phase = np.angle(complex_spectrum)
         # 欧拉公式 e^ix = cos(x)+i*sin(x), 因(e^a)*(e^b)=e^(a+b) --> (e^0)*(e^x)=e^(0+x)
         restore_complex_spectrum = amp_spectrum * np.exp(1j * phase)
-        restore_complex_spectrum2 = amp_spectrum * (np.cos(phase)+1j*np.sin(phase))
+        restore_complex_spectrum2 = amp_spectrum * (np.cos(phase) + 1j * np.sin(phase))
 
         self.imshow(amp_spectrum)
 
         spec = np.log1p(amp_spectrum)
         return amp_spectrum, spec, phase
 
+    def play(self, frames, winfunc=lambda x: np.ones((x,))):
+        p = pyaudio.PyAudio()
+        stream = p.open(format=p.get_format_from_width(self.sampwidth),
+                        channels=self.nchannels,
+                        rate=self.sampling_rate,
+                        output=True)
+        effective = int(self.frame_step / self.frame_time * self.frame_length)
+        # 若使用窗函数处理过信号，则需进行还原
+        iwin = 1 / winfunc(frames.shape[1])
+        frames = frames * iwin
+        show_len = 800
+        spectrogram = np.zeros((effective, show_len))
+        for frame in frames:
+            frame = frame[:effective]
+            wave_data = np.asarray(frame * self.signal_maximum, np.short)
+            wave_data = np.maximum(np.minimum(wave_data, 32767), -32768)
+            wave_data = wave_data.tobytes()
+            stream.write(wave_data)
+
+            sepc = np.fft.fft(frame)
+            amp = np.abs(sepc)
+            amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
+            amp_real_log = np.log10(np.maximum(1e-10, amp_real))
+            amp_real_log = (amp_real_log - amp_real_log.min()) / (amp_real_log.max() - amp_real_log.min())
+            spectrogram[:, :-1] = spectrogram[:, 1:]
+            spectrogram[:, -1] = amp_real_log
+            images = np.copy(spectrogram)
+            stop = sepc.shape[0]
+            for i in range(stop):
+                text = f"{i}HZ"
+                if i > stop / 2:
+                    text = f"{stop - i}HZ"
+                if i % 50 == 0: cv2.putText(images, text, (12, i+3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                if i % 50 == 0: cv2.line(images, (0, i), (10, i),  (255, 255, 255), 1)
+            cv2.imshow("", images)
+            cv2.waitKey(1)
+
 
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
-    audio_deal = AudioDeal()
+    audio_deal = AudioDeal(frame_time=64)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
+    # frames = audio_deal.piecewise(speech_signal, sampling_rate)
+    audio_deal.play(frames, winfunc=audio_deal.hanming)
     audio_deal.frames_to_spectrogram(frames)
     print()
