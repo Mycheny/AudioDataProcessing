@@ -186,6 +186,13 @@ class AudioDeal():
         frames = frames * iwin
         show_len = 800
         spectrogram = np.zeros((effective, show_len))
+
+        frames = get_y3([0, 50, 75, 100], sr=1000)
+        frames = np.tile(frames.reshape((1, -1)), [10000, 1])
+        frames = (frames-frames.min()) / (frames.max()-frames.min())
+        effective = frames.shape[1]
+        spectrogram = np.zeros((effective, show_len))
+
         for frame in frames:
             frame = frame[:effective]
             wave_data = np.asarray(frame * self.signal_maximum, np.short)
@@ -215,7 +222,7 @@ class AudioDeal():
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
-    audio_deal = AudioDeal(frame_time=64)
+    audio_deal = AudioDeal(frame_time=32)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)
