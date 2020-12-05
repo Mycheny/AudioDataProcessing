@@ -7,6 +7,7 @@
 import math
 import wave
 import cv2
+import librosa
 import numpy as np
 import pyaudio
 from pylab import mpl
@@ -187,11 +188,11 @@ class AudioDeal():
         show_len = 800
         spectrogram = np.zeros((effective, show_len))
 
-        frames = get_y3([0, 50, 75, 100], sr=1000)
-        frames = np.tile(frames.reshape((1, -1)), [10000, 1])
-        frames = (frames-frames.min()) / (frames.max()-frames.min())
-        effective = frames.shape[1]
-        spectrogram = np.zeros((effective, show_len))
+        # frames = get_y3([0, 50, 75, 100], sr=self.sampling_rate)
+        # frames = np.tile(frames.reshape((1, -1)), [10000, 1])
+        # frames = (frames-frames.min()) / (frames.max()-frames.min())
+        # effective = frames.shape[1]
+        # spectrogram = np.zeros((effective, show_len))
 
         for frame in frames:
             frame = frame[:effective]
@@ -201,6 +202,8 @@ class AudioDeal():
             stream.write(wave_data)
 
             sepc = np.fft.fft(frame)
+            # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
+            # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
             amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
             amp_real_log = np.log10(np.maximum(1e-10, amp_real))
