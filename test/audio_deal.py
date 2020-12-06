@@ -174,6 +174,21 @@ class AudioDeal():
 
         spec_log = np.log10(np.maximum(1e-10, amp_spectrum))
         return amp_spectrum, spec_log, phase
+    
+    def microphone(self, NUM_SAMPLES=None):
+        if NUM_SAMPLES is None:
+            NUM_SAMPLES = self.frame_length
+        TIME= 100
+        pa = pyaudio.PyAudio()
+        stream = pa.open(format=pyaudio.paInt16, channels=1,
+                         rate=self.sampling_rate, input=True,
+                         frames_per_buffer=NUM_SAMPLES)
+        my_buf = []
+        count = 0
+        while count < TIME * 8:  # 控制录音时间
+            string_audio_data = stream.read(NUM_SAMPLES)
+            wave_data = np.fromstring(string_audio_data, dtype=np.short)
+            yield wave_data
 
     def play(self, frames, winfunc=lambda x: np.ones((x,))):
         p = pyaudio.PyAudio()
@@ -188,7 +203,8 @@ class AudioDeal():
         show_len = 1200
         spectrogram = np.zeros((effective, show_len))
 
-        for frame in frames:
+        # for frame in frames:
+        for frame in self.microphone():
             # frame = get_y3([180], sr=self.sampling_rate)
             # frame = (frame - frame.min()) / (frame.max() - frame.min())
 
