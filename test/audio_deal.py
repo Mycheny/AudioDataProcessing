@@ -202,6 +202,7 @@ class AudioDeal():
             stream.write(wave_data)
 
             sepc = np.fft.fft(frame)
+            freq = np.fft.fftfreq(np.size(frame, 0), 1/self.sampling_rate)
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
@@ -213,19 +214,27 @@ class AudioDeal():
             images = np.copy(spectrogram)
             stop = sepc.shape[0]
             for i in range(stop):
-                text = f"{i}HZ"
+                text = f"{freq[i]}HZ"
                 if i > stop / 2:
-                    text = f"{stop - i}HZ"
+                    text = f"{freq[i]}HZ"
                 if i % 50 == 0: cv2.putText(images, text, (12, i+3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                 if i % 50 == 0: cv2.line(images, (0, i), (10, i),  (255, 255, 255), 1)
+            win_h, win_w = 2*746, 1366
+            h, w = images.shape
+            if h > win_h or w > win_w:
+                if h > w:
+                    h, w = win_h, int(w * win_h / h)
+                else:
+                    h, w = int(win_w * w / h), win_w
+            images = cv2.resize(images, (w, h))
             cv2.imshow("", images)
             cv2.waitKey(1)
 
 
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
-    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
-    audio_deal = AudioDeal(frame_time=32)
+    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
+    audio_deal = AudioDeal(frame_time=20)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)

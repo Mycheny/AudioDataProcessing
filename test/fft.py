@@ -101,5 +101,26 @@ def main2():
     plt.close()
 
 
+def test():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # 产生正弦信号
+    Ts = 0.001
+    t = Ts * np.array(range(1000))
+    x = np.cos(2 * np.pi * 325 * t)
+
+    # FFT变换
+    X = np.fft.fft(x, np.size(x, 0), axis=0) / x.size * 2
+    freq = np.fft.fftfreq(np.size(x, 0), Ts)
+
+    plt.figure(1)
+    plt.plot(t, x)
+    plt.show()
+    plt.figure(2)
+    plt.plot(freq, np.real(X))
+    plt.show()
+
+
 if __name__ == '__main__':
-   main2()
+   # main2()
+   test()
