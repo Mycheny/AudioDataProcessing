@@ -183,26 +183,38 @@ class AudioDeal():
         stream = pa.open(format=pyaudio.paInt16, channels=1,
                          rate=self.sampling_rate, input=True,
                          frames_per_buffer=NUM_SAMPLES)
-        my_buf = []
         count = 0
         while count < TIME * 8:  # 控制录音时间
+            # count+=1
             string_audio_data = stream.read(NUM_SAMPLES)
             wave_data = np.fromstring(string_audio_data, dtype=np.short)
+            wave_data = wave_data/self.signal_maximum
             yield wave_data
 
     def play(self, frames, winfunc=lambda x: np.ones((x,))):
+        def save_wave_file(data, filename="result.wav"):
+            '''save the data to the wavfile'''
+            wf = wave.open(filename, 'wb')
+            wf.setnchannels(self.nchannels)
+            wf.setsampwidth(self.sampwidth)
+            wf.setframerate(self.sampling_rate)
+            wf.writeframes(b"".join(data))
+            wf.close()
+
         p = pyaudio.PyAudio()
         stream = p.open(format=p.get_format_from_width(self.sampwidth),
                         channels=self.nchannels,
                         rate=self.sampling_rate,
                         output=True)
         effective = int(self.frame_step / self.frame_time * self.frame_length)
+        effective = effective*2  # 实时采集音频时
         # 若使用窗函数处理过信号，则需进行还原
         iwin = 1 / winfunc(frames.shape[1])
         frames = frames * iwin
         show_len = 1200
         spectrogram = np.zeros((effective, show_len))
 
+        wave_datas = []
         # for frame in frames:
         for frame in self.microphone():
             # frame = get_y3([180], sr=self.sampling_rate)
@@ -210,9 +222,10 @@ class AudioDeal():
 
             frame = frame[:effective]
             # frame = frame[int((frame.shape[0]-effective)/2):int((frame.shape[0]+effective)/2)]
-            wave_data = np.asarray(frame * self.signal_maximum, np.short)
-            wave_data = np.maximum(np.minimum(wave_data, 32767), -32768)
-            wave_data = wave_data.tobytes()
+            frame_restore = frame * self.signal_maximum
+            wave_data_short = np.asarray(frame_restore, np.short)
+            wave_data_short = np.maximum(np.minimum(wave_data_short, 32767), -32768)
+            wave_data = wave_data_short.tobytes()
             # stream.write(wave_data)  # 播放原始语音
 
             sepc = np.fft.fft(frame)
@@ -235,10 +248,12 @@ class AudioDeal():
             restore_wave_data = np.maximum(np.minimum(restore_wave_data, 32767), -32768)
             restore_wave_data = restore_wave_data.tobytes()
             stream.write(restore_wave_data)   # 播放还原的语音
+            wave_datas.append(restore_wave_data)
 
             amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
-            amp_real_log = np.log10(np.maximum(1e-10, amp_real))
-            amp_real_log = (amp_real_log - amp_real_log.min()) / (amp_real_log.max() - amp_real_log.min())
+            amp_real_log = (amp_real - amp_real.min()) / (amp_real.max() - amp_real.min())
+            # amp_real_log = np.log10(np.maximum(1e-10, amp_real))
+            # amp_real_log = (amp_real_log - amp_real_log.min()) / (amp_real_log.max() - amp_real_log.min())
             spectrogram[:, :-1] = spectrogram[:, 1:]
             spectrogram[:, -1] = amp_real_log
             images = np.copy(spectrogram)
@@ -248,6 +263,7 @@ class AudioDeal():
                     text = f"{round(freq[i], 1)}HZ"
                     cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                     cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
+            cv2.line(spectrogram, (show_len-1, effective//4+int(frame_restore.min()/(self.signal_maximum/1)* effective//4)), (show_len-1, effective//4+int(frame_restore.max()/(self.signal_maximum/1) * effective//4)), (127, 127, 127), 1)
             win_h, win_w = 746, 1366
             h, w = images.shape
             if h > win_h or w > win_w:
@@ -258,6 +274,7 @@ class AudioDeal():
             images = cv2.resize(images, (w, h))
             cv2.imshow("", images)
             cv2.waitKey(1)
+        save_wave_file(wave_datas)
 
 
 if __name__ == '__main__':
