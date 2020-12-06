@@ -52,7 +52,7 @@ def get_y3(frequencys: list, sr=8000, amplitude=None, initial_phase=None, show_T
         amplitude = [1] * len(frequencys)
     if initial_phase is None:
         initial_phase = [0] * len(frequencys)
-    y = np.zeros_like(get_random_wave(0, sr=sr))
+    y = np.zeros_like(get_random_wave(0, sr=sr, show_T=show_T))
     for i, frequency in enumerate(frequencys):
         y += get_random_wave(frequency, sr=sr, amplitude=amplitude[i], initial_phase=initial_phase[i], show_T=show_T)
     return y
@@ -157,11 +157,16 @@ class AudioDeal():
         cv2.imshow(win_name, images.T)
         cv2.waitKey(delay=delay)
 
-    def frames_to_spectrogram(self, frames):
-        # frames = get_y3([0, 50, 75], sr=200, amplitude=[2, 3, 1.5],
+    def frames_to_spectrogram(self, frames, n=None):
+        # frames = get_y3([0, 50, 75], sr=self.sampling_rate, amplitude=[2, 3, 1.5],
         #                 initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
-        # frames = np.tile(frames.reshape((1, -1)), [10, 1])
-        complex_spectrum = np.fft.fft(frames, n=None)  # n默认为frames.shape[-1]，此时结果的索引即对应频率，若n为默认值乘以2，则索引乘以2等于频率
+        # frame = get_y3([180], sr=self.sampling_rate)
+        frame = get_y3([180], sr=self.sampling_rate, show_T=2)
+        frames = np.tile(frame.reshape((1, -1)), [10, 1])
+        if n is None:
+            n = frames.shape[-1]
+        complex_spectrum = np.fft.fft(frames, n=n)  # n默认为frames.shape[-1]，当信号长度刚好为1秒时， 结果的索引即对应频率，若n为默认值乘以2，则索引乘以2等于频率
+        freq = np.fft.fftfreq(n, 1 / self.sampling_rate)
         amp_spectrum = np.absolute(complex_spectrum)
         amp_spectrum = np.concatenate(((amp_spectrum / frames.shape[1])[:, :1],
                                        (amp_spectrum / (frames.shape[1] / 2))[:, 1:]), axis=1)
@@ -172,8 +177,8 @@ class AudioDeal():
 
         self.imshow(amp_spectrum)
 
-        spec = np.log1p(amp_spectrum)
-        return amp_spectrum, spec, phase
+        spec_log = np.log10(np.maximum(1e-10, amp_spectrum))
+        return amp_spectrum, spec_log, phase
 
     def play(self, frames, winfunc=lambda x: np.ones((x,))):
         p = pyaudio.PyAudio()
@@ -185,24 +190,22 @@ class AudioDeal():
         # 若使用窗函数处理过信号，则需进行还原
         iwin = 1 / winfunc(frames.shape[1])
         frames = frames * iwin
-        show_len = 800
+        show_len = 1200
         spectrogram = np.zeros((effective, show_len))
 
-        # frames = get_y3([0, 50, 75, 100], sr=self.sampling_rate)
-        # frames = np.tile(frames.reshape((1, -1)), [10000, 1])
-        # frames = (frames-frames.min()) / (frames.max()-frames.min())
-        # effective = frames.shape[1]
-        # spectrogram = np.zeros((effective, show_len))
-
         for frame in frames:
+            # frame = get_y3([180], sr=self.sampling_rate)
+            # frame = (frame - frame.min()) / (frame.max() - frame.min())
+
             frame = frame[:effective]
+            # frame = frame[int((frame.shape[0]-effective)/2):int((frame.shape[0]+effective)/2)]
             wave_data = np.asarray(frame * self.signal_maximum, np.short)
             wave_data = np.maximum(np.minimum(wave_data, 32767), -32768)
             wave_data = wave_data.tobytes()
             stream.write(wave_data)
 
             sepc = np.fft.fft(frame)
-            freq = np.fft.fftfreq(np.size(frame, 0), 1/self.sampling_rate)
+            freq = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
@@ -214,12 +217,11 @@ class AudioDeal():
             images = np.copy(spectrogram)
             stop = sepc.shape[0]
             for i in range(stop):
-                text = f"{freq[i]}HZ"
-                if i > stop / 2:
-                    text = f"{freq[i]}HZ"
-                if i % 50 == 0: cv2.putText(images, text, (12, i+3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                if i % 50 == 0: cv2.line(images, (0, i), (10, i),  (255, 255, 255), 1)
-            win_h, win_w = 2*746, 1366
+                if i % 100 == 0:
+                    text = f"{round(freq[i], 1)}HZ"
+                    cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                    cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
+            win_h, win_w = 746, 1366
             h, w = images.shape
             if h > win_h or w > win_w:
                 if h > w:
@@ -234,10 +236,11 @@ class AudioDeal():
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
-    audio_deal = AudioDeal(frame_time=20)
+    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
+    audio_deal = AudioDeal(frame_time=25)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)
-    audio_deal.play(frames, winfunc=audio_deal.hanming)
+    # audio_deal.play(frames, winfunc=audio_deal.hanming)
     audio_deal.frames_to_spectrogram(frames)
     print()
