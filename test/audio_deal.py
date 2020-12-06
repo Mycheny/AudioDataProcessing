@@ -158,11 +158,6 @@ class AudioDeal():
         cv2.waitKey(delay=delay)
 
     def frames_to_spectrogram(self, frames, n=None):
-        # frames = get_y3([0, 50, 75], sr=self.sampling_rate, amplitude=[2, 3, 1.5],
-        #                 initial_phase=[0 * np.pi / 180, -30 * np.pi / 180, 90 * np.pi / 180])
-        # frame = get_y3([180], sr=self.sampling_rate)
-        frame = get_y3([180], sr=self.sampling_rate, show_T=2)
-        frames = np.tile(frame.reshape((1, -1)), [10, 1])
         if n is None:
             n = frames.shape[-1]
         complex_spectrum = np.fft.fft(frames, n=n)  # n默认为frames.shape[-1]，当信号长度刚好为1秒时， 结果的索引即对应频率，若n为默认值乘以2，则索引乘以2等于频率
@@ -202,13 +197,29 @@ class AudioDeal():
             wave_data = np.asarray(frame * self.signal_maximum, np.short)
             wave_data = np.maximum(np.minimum(wave_data, 32767), -32768)
             wave_data = wave_data.tobytes()
-            stream.write(wave_data)
+            # stream.write(wave_data)  # 播放原始语音
 
             sepc = np.fft.fft(frame)
             freq = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
+            phase = np.angle(sepc)
+            # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0
+            # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0
+
+
+            restore_sepc = amp*np.exp(1j*phase)
+            restore_signal_complex = np.fft.ifft(restore_sepc)
+            restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
+            restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
+            restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
+
+            restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
+            restore_wave_data = np.maximum(np.minimum(restore_wave_data, 32767), -32768)
+            restore_wave_data = restore_wave_data.tobytes()
+            stream.write(restore_wave_data)   # 播放还原的语音
+
             amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
             amp_real_log = np.log10(np.maximum(1e-10, amp_real))
             amp_real_log = (amp_real_log - amp_real_log.min()) / (amp_real_log.max() - amp_real_log.min())
@@ -241,6 +252,6 @@ if __name__ == '__main__':
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)
-    # audio_deal.play(frames, winfunc=audio_deal.hanming)
-    audio_deal.frames_to_spectrogram(frames)
+    audio_deal.play(frames, winfunc=audio_deal.hanming)
+    # audio_deal.frames_to_spectrogram(frames)
     print()
