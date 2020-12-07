@@ -216,13 +216,13 @@ class AudioDeal():
         amp_real_min = 0.001
         amp_real_max = 0.001
         wave_datas = []
-        # for frame in frames:
-        for frame in self.microphone():
+        for frame in frames:
+        # for frame in self.microphone():
             # frame = get_y3([180], sr=self.sampling_rate)
             # frame = (frame - frame.min()) / (frame.max() - frame.min())
 
-            frame = frame[:effective]
-            # frame = frame[int((frame.shape[0]-effective)/2):int((frame.shape[0]+effective)/2)]
+            # frame = frame[:effective]
+            frame = frame[int((frame.shape[0]-effective)/2):int((frame.shape[0]+effective)/2)]
             frame_restore = frame * self.signal_maximum
             wave_data_short = np.asarray(frame_restore, np.short)
             wave_data_short = np.maximum(np.minimum(wave_data_short, 32767), -32768)
@@ -266,7 +266,7 @@ class AudioDeal():
                     text = f"{round(freq[i], 1)}HZ"
                     cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                     cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
-            cv2.line(spectrogram, (show_len-1, effective//4+int(frame_restore.min()/(self.signal_maximum/1)* effective//4)), (show_len-1, effective//4+int(frame_restore.max()/(self.signal_maximum/1) * effective//4)), (127, 127, 127), 1)
+            cv2.line(spectrogram, (show_len-1, effective//2+int(frame_restore.min()/(self.signal_maximum/1)* effective//8)), (show_len-1, effective//2+int(frame_restore.max()/(self.signal_maximum/1) * effective//8)), (127, 127, 127), 1)
             win_h, win_w = 746, 1366
             h, w = images.shape
             if h > win_h or w > win_w:
@@ -275,35 +275,20 @@ class AudioDeal():
                 else:
                     h, w = int(win_w * w / h), win_w
             images = cv2.resize(images, (w, h))
-            cv2.imshow("", images)
+            cv2.imshow("images", images)
             cv2.waitKey(1)
         save_wave_file(wave_datas)
 
 
 if __name__ == '__main__':
-    # # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
-    # audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
-    # audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
-    # audio_deal = AudioDeal(frame_time=20)
-    # sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
-    # frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
-    # # frames = audio_deal.piecewise(speech_signal, sampling_rate)
-    # audio_deal.play(frames, winfunc=audio_deal.hanming)
-    # # audio_deal.frames_to_spectrogram(frames)
-    # print()
-    from matplotlib import pyplot as plt
-    pa = pyaudio.PyAudio()
-    stream = pa.open(format=pyaudio.paInt16, channels=1,
-                     rate=44000, input=True,
-                     frames_per_buffer=100)
-    wave_datas = []
-    for i in range(10000):  # 控制录音时间
-        string_audio_data = stream.read(100)
-        wave_data = np.fromstring(string_audio_data, dtype=np.short)
-        if wave_data.max()>2:
-            wave_datas.extend(wave_data)
-        if len(wave_datas)>1000:
-            break
-
-    plt.plot(wave_datas)
-    plt.show()
+    # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
+    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
+    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
+    audio_file = r"/home/wcirq/PycharmProjects/AudioDataProcessing/resources/data/1.wav"
+    audio_deal = AudioDeal(frame_time=40)
+    sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
+    frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
+    # frames = audio_deal.piecewise(speech_signal, sampling_rate)
+    audio_deal.play(frames, winfunc=audio_deal.hanming)
+    # audio_deal.frames_to_spectrogram(frames)
+    print()
