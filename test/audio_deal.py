@@ -274,44 +274,44 @@ class AudioDeal():
             stream.write(restore_wave_data)  # 播放还原的语音
             wave_datas.append(restore_wave_data)  # 将还原的语言暂存wave_datas用于保存
 
-            # # 绘制语谱图
-            # amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
-            # amp_real_max = max(amp_real_max, amp_real.max() / 2)
-            # amp_real_min = min(amp_real_min, amp_real.min() / 2)
-            # amp_real_norm = (amp_real - amp_real_min) / (amp_real_max - amp_real_min)
-            # # amp_real_log = np.log10(np.maximum(1e-10, amp_real_norm))
-            # # amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
-            # spectrogram[:, :-1] = spectrogram[:, 1:]
-            # spectrogram[:, -1] = amp_real_norm
-            #
-            # # 在语谱图上绘制频率标尺
-            # images = np.copy(spectrogram)
-            # stop = sepc.shape[0]
-            # for i in range(stop):
-            #     if i % 100 == 0:
-            #         text = f"{round(freq_ruler[i], 1)}HZ"
-            #         cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-            #         cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
-            #
-            # # 绘制波形
-            # cv2.line(spectrogram,
-            #          (show_len - 1, int((effective + frame.min() * effective * scale)//2)),
-            #          (show_len - 1, int((effective + frame.max() * effective * scale)//2)),
-            #          (127, 127, 127), 1)
-            #
-            # # 缩放语谱图到合适的大小
-            # win_h, win_w = 746, 1366
-            # h, w = images.shape
-            # if h > win_h or w > win_w:
-            #     if h > w:
-            #         h, w = win_h, int(w * win_h / h)
-            #     else:
-            #         h, w = int(win_w * w / h), win_w
-            # images = cv2.resize(images, (w, h))
-            #
-            # # 展示语谱图
-            # cv2.imshow("images", images)
-            # cv2.waitKey(1)
+            # 绘制语谱图
+            amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
+            amp_real_max = max(amp_real_max, amp_real.max() / 2)
+            amp_real_min = min(amp_real_min, amp_real.min() / 2)
+            amp_real_norm = (amp_real - amp_real_min) / (amp_real_max - amp_real_min)
+            # amp_real_log = np.log10(np.maximum(1e-10, amp_real_norm))
+            # amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
+            spectrogram[:, :-1] = spectrogram[:, 1:]
+            spectrogram[:, -1] = amp_real_norm
+
+            # 在语谱图上绘制频率标尺
+            images = np.copy(spectrogram)
+            stop = sepc.shape[0]
+            for i in range(stop):
+                if i % 100 == 0:
+                    text = f"{round(freq_ruler[i], 1)}HZ"
+                    cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                    cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
+
+            # 绘制波形
+            cv2.line(spectrogram,
+                     (show_len - 1, int((effective + frame.min() * effective * scale)//2)),
+                     (show_len - 1, int((effective + frame.max() * effective * scale)//2)),
+                     (127, 127, 127), 1)
+
+            # 缩放语谱图到合适的大小
+            win_h, win_w = 746, 1366
+            h, w = images.shape
+            if h > win_h or w > win_w:
+                if h > w:
+                    h, w = win_h, int(w * win_h / h)
+                else:
+                    h, w = int(win_w * w / h), win_w
+            images = cv2.resize(images, (w, h))
+
+            # 展示语谱图
+            cv2.imshow("images", images)
+            cv2.waitKey(1)
         self.save_wave_file(wave_datas)
 
 
