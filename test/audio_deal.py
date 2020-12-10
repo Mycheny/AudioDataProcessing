@@ -174,99 +174,128 @@ class AudioDeal():
 
         spec_log = np.log10(np.maximum(1e-10, amp_spectrum))
         return amp_spectrum, spec_log, phase
-    
-    def microphone(self, NUM_SAMPLES=None):
-        if NUM_SAMPLES is None:
-            NUM_SAMPLES = self.frame_length
-        TIME= 100
+
+    def save_wave_file(self, data, filename="result.wav"):
+        '''save the data to the wavfile'''
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(self.nchannels)
+        wf.setsampwidth(self.sampwidth)
+        wf.setframerate(self.sampling_rate)
+        wf.writeframes(b"".join(data))
+        wf.close()
+
+    def microphone(self, num_samples=None):
+        """
+        从麦克风采集音频
+        :param num_samples: 样本数（即相当于帧长）
+        :return:
+        """
+        if num_samples is None:
+            num_samples = self.frame_length
+        TIME = 100
         pa = pyaudio.PyAudio()
         stream = pa.open(format=pyaudio.paInt16, channels=1,
                          rate=self.sampling_rate, input=True,
-                         frames_per_buffer=NUM_SAMPLES)
+                         frames_per_buffer=num_samples)
         count = 0
         while count < TIME * 8:  # 控制录音时间
             # count+=1
-            string_audio_data = stream.read(NUM_SAMPLES)
+            string_audio_data = stream.read(num_samples)
             wave_data = np.fromstring(string_audio_data, dtype=np.short)
-            wave_data = wave_data/self.signal_maximum
+            wave_data = wave_data / self.signal_maximum  # 归一化
             yield wave_data
 
-    def play(self, frames, winfunc=lambda x: np.ones((x,))):
-        def save_wave_file(data, filename="result.wav"):
-            '''save the data to the wavfile'''
-            wf = wave.open(filename, 'wb')
-            wf.setnchannels(self.nchannels)
-            wf.setsampwidth(self.sampwidth)
-            wf.setframerate(self.sampling_rate)
-            wf.writeframes(b"".join(data))
-            wf.close()
+    def play(self, frames=None, winfunc=lambda x: np.ones((x,)), intercept=1, scale=0.5):
+        """
 
+        :param frames: 若为None则从麦克风读取
+        :param winfunc:
+        :param intercept: 因为分帧时有重叠部分，所以这里有两种截取方式, 0-截取前部分，1-截取中间部分, 其他为不截取(播放时相当于慢放)
+        :param scale: 语音波形的振幅相对语谱图的缩放比例，默认为0.5,,即振幅最多占语谱图的一半
+        :return:
+        """
+        if frames is None:
+            frames = self.microphone()
+            effective = int(self.frame_step / self.frame_time * self.frame_length)  # 实时采集音频时
+        else:
+            effective = int(self.frame_step / self.frame_time * self.frame_length)
+
+            # 若使用窗函数处理过信号，则需进行还原
+            iwin = 1 / winfunc(frames.shape[1])
+            frames = frames * iwin
         p = pyaudio.PyAudio()
         stream = p.open(format=p.get_format_from_width(self.sampwidth),
                         channels=self.nchannels,
                         rate=self.sampling_rate,
                         output=True)
-        effective = int(self.frame_step / self.frame_time * self.frame_length)
-        effective = effective  # 实时采集音频时
-        # 若使用窗函数处理过信号，则需进行还原
-        iwin = 1 / winfunc(frames.shape[1])
-        frames = frames * iwin
+
         show_len = 1200
-        spectrogram = np.zeros((effective, show_len))
+        if intercept == 0 or intercept == 1:
+            spectrogram = np.zeros((effective, show_len))
+            if intercept == 0:
+                intercept_s, intercept_e = 0, effective
+            else:
+                intercept_s, intercept_e = int((self.frame_length - effective) / 2), int((self.frame_length + effective) / 2)
+        else:
+            intercept_s, intercept_e = 0, -1
+            spectrogram = np.zeros((frames.shape[1], show_len))
         amp_real_min = 0.001
         amp_real_max = 0.001
         wave_datas = []
         for frame in frames:
-        # for frame in self.microphone():
-            # frame = get_y3([180], sr=self.sampling_rate)
-            # frame = (frame - frame.min()) / (frame.max() - frame.min())
+            frame = frame[intercept_s:intercept_e]
 
-            # frame = frame[:effective]
-            frame = frame[int((frame.shape[0]-effective)/2):int((frame.shape[0]+effective)/2)]
-            frame_restore = frame * self.signal_maximum
-            wave_data_short = np.asarray(frame_restore, np.short)
-            wave_data_short = np.maximum(np.minimum(wave_data_short, 32767), -32768)
-            wave_data = wave_data_short.tobytes()
+            # 还原音频并播放
+            # frame_restore = frame * self.signal_maximum
+            # wave_data_short = np.asarray(frame_restore, np.short)
+            # wave_data = wave_data_short.tobytes()
             # stream.write(wave_data)  # 播放原始语音
 
+            # 尝试傅里叶变换后再进行其逆变换还原语音并播放
             sepc = np.fft.fft(frame)
-            freq = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)
+            freq_ruler = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)  # 频率标尺
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
             phase = np.angle(sepc)
-            # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0
-            # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0
-
-
-            restore_sepc = amp*np.exp(1j*phase)
+            # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0  # 将振幅高频区域置零
+            # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0  # 将相位高频区域置零
+            restore_sepc = amp * np.exp(1j * phase)
             restore_signal_complex = np.fft.ifft(restore_sepc)
             restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
             restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
             restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
-
             restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
-            restore_wave_data = np.maximum(np.minimum(restore_wave_data, 32767), -32768)
             restore_wave_data = restore_wave_data.tobytes()
-            stream.write(restore_wave_data)   # 播放还原的语音
-            wave_datas.append(restore_wave_data)
+            stream.write(restore_wave_data)  # 播放还原的语音
+            wave_datas.append(restore_wave_data)  # 将还原的语言暂存wave_datas用于保存
 
+            # 绘制语谱图
             amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
-            amp_real_max = max(amp_real_max, amp_real.max()/2)
-            amp_real_min = min(amp_real_min, amp_real.min()/2)
+            amp_real_max = max(amp_real_max, amp_real.max() / 2)
+            amp_real_min = min(amp_real_min, amp_real.min() / 2)
             amp_real_norm = (amp_real - amp_real_min) / (amp_real_max - amp_real_min)
             # amp_real_log = np.log10(np.maximum(1e-10, amp_real_norm))
             # amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
             spectrogram[:, :-1] = spectrogram[:, 1:]
             spectrogram[:, -1] = amp_real_norm
+
+            # 在语谱图上绘制频率标尺
             images = np.copy(spectrogram)
             stop = sepc.shape[0]
             for i in range(stop):
                 if i % 100 == 0:
-                    text = f"{round(freq[i], 1)}HZ"
+                    text = f"{round(freq_ruler[i], 1)}HZ"
                     cv2.putText(images, text, (12, i + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                     cv2.line(images, (0, i), (10, i), (255, 255, 255), 1)
-            cv2.line(spectrogram, (show_len-1, effective//2+int(frame_restore.min()/(self.signal_maximum/1)* effective//8)), (show_len-1, effective//2+int(frame_restore.max()/(self.signal_maximum/1) * effective//8)), (127, 127, 127), 1)
+
+            # 绘制波形
+            cv2.line(spectrogram,
+                     (show_len - 1, int((effective + frame.min() * effective * scale)//2)),
+                     (show_len - 1, int((effective + frame.max() * effective * scale)//2)),
+                     (127, 127, 127), 1)
+
+            # 缩放语谱图到合适的大小
             win_h, win_w = 746, 1366
             h, w = images.shape
             if h > win_h or w > win_w:
@@ -275,17 +304,19 @@ class AudioDeal():
                 else:
                     h, w = int(win_w * w / h), win_w
             images = cv2.resize(images, (w, h))
+
+            # 展示语谱图
             cv2.imshow("images", images)
             cv2.waitKey(1)
-        save_wave_file(wave_datas)
+        self.save_wave_file(wave_datas)
 
 
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
-    audio_file = r"/home/wcirq/PycharmProjects/AudioDataProcessing/resources/data/1.wav"
-    audio_deal = AudioDeal(frame_time=40)
+    # audio_file = r"E:\PycharmProjects\AudioDataProcessing\resources\data\0subeijun_qu.wav"
+    audio_deal = AudioDeal(frame_time=32)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)
