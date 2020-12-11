@@ -4,7 +4,9 @@
 # @Author wcy
 # @Software: PyCharm
 # @Site
+import inspect
 import math
+import types
 import wave
 import cv2
 import librosa
@@ -175,7 +177,7 @@ class AudioDeal():
         spec_log = np.log10(np.maximum(1e-10, amp_spectrum))
         return amp_spectrum, spec_log, phase
 
-    def save_wave_file(self, data, filename="result.wav"):
+    def save_wave_file(self, data, filename="result2.wav"):
         '''save the data to the wavfile'''
         wf = wave.open(filename, 'wb')
         wf.setnchannels(self.nchannels)
@@ -210,13 +212,14 @@ class AudioDeal():
 
         :param frames: 若为None则从麦克风读取
         :param winfunc:
-        :param intercept: 因为分帧时有重叠部分，所以这里有两种截取方式, 0-截取前部分，1-截取中间部分, 其他为不截取(播放时相当于慢放)
+        :param intercept: 因为分帧时有重叠部分，所以这里有两种截取方式, 0-截取前部分，1-截取中间部分, 其他为不截取(读取wav文件播放时相当于慢放)
         :param scale: 语音波形的振幅相对语谱图的缩放比例，默认为0.5,,即振幅最多占语谱图的一半
         :return:
         """
         if frames is None:
             frames = self.microphone()
-            effective = int(self.frame_step / self.frame_time * self.frame_length)  # 实时采集音频时
+            effective = self.frame_length  # 实时采集音频时
+            intercept = 2  # 不截取
         else:
             effective = int(self.frame_step / self.frame_time * self.frame_length)
 
@@ -235,10 +238,16 @@ class AudioDeal():
             if intercept == 0:
                 intercept_s, intercept_e = 0, effective
             else:
-                intercept_s, intercept_e = int((self.frame_length - effective) / 2), int((self.frame_length + effective) / 2)
+                intercept_s, intercept_e = int((self.frame_length - effective) / 2), int(
+                    (self.frame_length + effective) / 2)
         else:
-            intercept_s, intercept_e = 0, -1
-            spectrogram = np.zeros((frames.shape[1], show_len))
+            intercept_s, intercept_e = 0, None
+            if isinstance(frames, types.GeneratorType):
+                frame = next(frames)
+                frames_h = frame.shape[0]
+            else:
+                frames_h = frames.shape[1]
+            spectrogram = np.zeros((frames_h, show_len))
         amp_real_min = 0.001
         amp_real_max = 0.001
         wave_datas = []
@@ -249,38 +258,40 @@ class AudioDeal():
             # frame_restore = frame * self.signal_maximum
             # wave_data_short = np.asarray(frame_restore, np.short)
             # wave_data = wave_data_short.tobytes()
-            # stream.write(wave_data)  # 播放原始语音
+            # # stream.write(wave_data)  # 播放原始语音
+            # wave_datas.append(wave_data)  # 将还原的语言暂存wave_datas用于保存
 
-            # 尝试傅里叶变换后再进行其逆变换还原语音并播放
+            # # 尝试傅里叶变换后再进行其逆变换还原语音并播放
             sepc = np.fft.fft(frame)
+            mel = self.sepc_to_mel(sepc)
             freq_ruler = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)  # 频率标尺
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
             phase = np.angle(sepc)
-            # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0  # 将振幅高频区域置零
-            # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0  # 将相位高频区域置零
-            # amp[:amp.shape[0]//4] = 0  # 将振幅低频区域置零
-            # amp[amp.shape[0]*3//4:] = 0  # 将振幅低频区域置零
-            # phase[:amp.shape[0]//4] = 0  # 将相位低频区域置零
-            # phase[amp.shape[0]*3//4:] = 0  # 将相位低频区域置零
-            restore_sepc = amp * np.exp(1j * phase)
-            restore_signal_complex = np.fft.ifft(restore_sepc)
-            restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
-            restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
-            restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
-            restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
-            restore_wave_data = restore_wave_data.tobytes()
-            stream.write(restore_wave_data)  # 播放还原的语音
-            wave_datas.append(restore_wave_data)  # 将还原的语言暂存wave_datas用于保存
+            # # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0  # 将振幅高频区域置零
+            # # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0  # 将相位高频区域置零
+            # # amp[:amp.shape[0]//4] = 0  # 将振幅低频区域置零
+            # # amp[amp.shape[0]*3//4:] = 0  # 将振幅低频区域置零
+            # # phase[:amp.shape[0]//4] = 0  # 将相位低频区域置零
+            # # phase[amp.shape[0]*3//4:] = 0  # 将相位低频区域置零
+            # restore_sepc = amp * np.exp(1j * phase)
+            # restore_signal_complex = np.fft.ifft(restore_sepc)
+            # restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
+            # restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
+            # restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
+            # restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
+            # restore_wave_data = restore_wave_data.tobytes()
+            # # stream.write(restore_wave_data)  # 播放还原的语音
+            # wave_datas.append(restore_wave_data)  # 将还原的语言暂存wave_datas用于保存
 
-            # 绘制语谱图
+            # # # 绘制语谱图
             amp_real = np.concatenate(((amp / len(frame))[:1], (amp / (len(frame) / 2))[1:]), axis=0)
             amp_real_max = max(amp_real_max, amp_real.max() / 2)
             amp_real_min = min(amp_real_min, amp_real.min() / 2)
             amp_real_norm = (amp_real - amp_real_min) / (amp_real_max - amp_real_min)
-            # amp_real_log = np.log10(np.maximum(1e-10, amp_real_norm))
-            # amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
+            amp_real_log = np.log10(np.maximum(1e-10, amp_real_norm))
+            amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
             spectrogram[:, :-1] = spectrogram[:, 1:]
             spectrogram[:, -1] = amp_real_norm
 
@@ -312,18 +323,77 @@ class AudioDeal():
             # 展示语谱图
             cv2.imshow("images", images)
             cv2.waitKey(1)
+
+            # if len(wave_datas) > 200:
+            #     break
         self.save_wave_file(wave_datas)
+
+    def get_filter_banks(self, filters_num=22, n=2000, samplerate=16000, low_freq=np.finfo(float).eps,
+                         high_freq=None, filter=1):
+        '''计算梅尔三角间距滤波器，该滤波器在第一个频率和第三个频率处为0，在第二个频率处为1
+        参数说明：
+        filers_num:滤波器个数
+        NFFT:FFT大小
+        samplerate:采样频率
+        low_freq:最低频率
+        high_freq:最高频率
+        '''
+        NFFT = 2 * n
+        # 首先，将频率hz转化为梅尔频率，因为人耳分辨声音的大小与频率并非线性正比，所以化为梅尔频率再线性分隔
+        high_freq = high_freq or samplerate / 2  # 计算音频样本的最大频率
+        low_mel = self.hz2bark(low_freq)
+        high_mel = self.hz2bark(high_freq)
+        # 需要在low_mel和high_mel之间等间距插入filters_num个点，一共filters_num+2个点
+        mel_points = np.linspace(low_mel, high_mel, filters_num + 2)
+        # 再将梅尔频率转化为hz频率，并且找到对应的hz位置
+        hz_points = self.bark2hz(mel_points)
+        # 我们现在需要知道这些hz_points对应到fft中的位置
+        bin = np.floor((NFFT + 1) * hz_points / samplerate)
+        # 接下来建立滤波器的表达式了，每个滤波器在第一个点处和第三个点处均为0，中间为三角形形状
+        fbank = np.zeros([filters_num, int(NFFT / 2 + 1)])
+
+        if filter == 0:  # 转为bark域时使用
+            #############################
+            # 矩形等面积滤波器(平均值滤波) #
+            #############################
+            for j in range(0, filters_num):
+                height = 1 / (int(bin[j + 2]) - int(bin[j]))
+                fbank[j, int(bin[j]):int(bin[j + 2])] = height
+        elif filter == 1:  # 转为spec时使用
+            for j in range(0, filters_num):
+                height = 1 / (int(bin[j + 2]) - int(bin[j]))
+                for i in range(int(bin[j]), int(bin[j + 1])):
+                    fbank[j, i] = (i - bin[j]) / (bin[j + 1] - bin[j]) * height
+                for i in range(int(bin[j + 1]), int(bin[j + 2])):
+                    fbank[j, i] = (bin[j + 2] - i) / (bin[j + 2] - bin[j + 1]) * height
+        return fbank
+
+    def sepc_to_mel(self, sepc):
+        fbank = self.get_filter_banks(filters_num=22, n=sepc.shape[0], samplerate=self.sampling_rate, low_freq=np.finfo(float).eps,
+                         high_freq=None, filter=0)
+        return
+
+    @staticmethod
+    def bark2hz(bark):
+        hz = 1960 / ((26.81 / (bark + 0.53)) - 1)
+        return hz
+
+    @staticmethod
+    def hz2bark(hz):
+        bark = 26.81 / (1 + (1960 / hz)) - 0.53
+        return bark
 
 
 if __name__ == '__main__':
     # audio_file = r"E:\FFOutput\20200907095114_18076088691.wav"
     audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\data\15KHz-44.1K-sine_0dB.wav"
-    audio_file = r"E:\PycharmProjects\AudioDataProcessing\test\rensheng.wav"
+    audio_file = r"/home/wcirq/PycharmProjects/AudioDataProcessing/resources/data/1.wav"
     # audio_file = r"E:\PycharmProjects\AudioDataProcessing\resources\data\0subeijun_qu.wav"
     audio_deal = AudioDeal(frame_time=32)
     sampling_rate, speech_signal = audio_deal.read_wav(audio_file, )
     frames = audio_deal.piecewise(speech_signal, sampling_rate, winfunc=audio_deal.hanming)
     # frames = audio_deal.piecewise(speech_signal, sampling_rate)
     audio_deal.play(frames, winfunc=audio_deal.hanming)
+    # audio_deal.play(winfunc=audio_deal.hanming)
     # audio_deal.frames_to_spectrogram(frames)
     print()
