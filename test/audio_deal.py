@@ -263,26 +263,25 @@ class AudioDeal():
 
             # # 尝试傅里叶变换后再进行其逆变换还原语音并播放
             sepc = np.fft.fft(frame)
-            mel = self.sepc_to_mel(sepc)
             freq_ruler = np.fft.fftfreq(np.size(frame, 0), 1 / self.sampling_rate)  # 频率标尺
             # sepc = librosa.stft(frame, n_fft=frame.shape[0]*2, hop_length=512, center=True)
             # sepc = sepc[:-1, 0]
             amp = np.abs(sepc)
             phase = np.angle(sepc)
-            # # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0  # 将振幅高频区域置零
-            # # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0  # 将相位高频区域置零
-            # # amp[:amp.shape[0]//4] = 0  # 将振幅低频区域置零
-            # # amp[amp.shape[0]*3//4:] = 0  # 将振幅低频区域置零
-            # # phase[:amp.shape[0]//4] = 0  # 将相位低频区域置零
-            # # phase[amp.shape[0]*3//4:] = 0  # 将相位低频区域置零
-            # restore_sepc = amp * np.exp(1j * phase)
-            # restore_signal_complex = np.fft.ifft(restore_sepc)
-            # restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
-            # restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
-            # restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
-            # restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
-            # restore_wave_data = restore_wave_data.tobytes()
-            # # stream.write(restore_wave_data)  # 播放还原的语音
+            # amp[amp.shape[0]//4:amp.shape[0]*3//4] = 0  # 将振幅高频区域置零
+            # phase[phase.shape[0]//4:phase.shape[0]*3//4] = 0  # 将相位高频区域置零
+            # amp[:amp.shape[0]//4] = 0  # 将振幅低频区域置零
+            # amp[amp.shape[0]*3//4:] = 0  # 将振幅低频区域置零
+            # phase[:amp.shape[0]//4] = 0  # 将相位低频区域置零
+            # phase[amp.shape[0]*3//4:] = 0  # 将相位低频区域置零
+            restore_sepc = amp * np.exp(1j * phase)
+            restore_signal_complex = np.fft.ifft(restore_sepc)
+            restore_signal_norm = np.abs(restore_signal_complex)  # 复数的模，作为语音信号，播放失真
+            restore_signal_real = restore_signal_complex.real  # 复数的实数部分，作为语音信号正常
+            restore_signal_imag = restore_signal_complex.imag  # 复数的实数部分，不能作为语音信号，播放为噪音
+            restore_wave_data = np.asarray(restore_signal_real * self.signal_maximum, np.short)
+            restore_wave_data = restore_wave_data.tobytes()
+            stream.write(restore_wave_data)  # 播放还原的语音
             # wave_datas.append(restore_wave_data)  # 将还原的语言暂存wave_datas用于保存
 
             # # # 绘制语谱图
@@ -294,6 +293,8 @@ class AudioDeal():
             amp_real_log = (amp_real_log - np.log10(np.maximum(1e-10, amp_real_min))) / (np.log10(np.maximum(1e-10, amp_real_max)) - np.log10(np.maximum(1e-10, amp_real_min)))
             spectrogram[:, :-1] = spectrogram[:, 1:]
             spectrogram[:, -1] = amp_real_norm
+
+            bark = self.sepc_to_mel(spectrogram)
 
             # 在语谱图上绘制频率标尺
             images = np.copy(spectrogram)
@@ -322,56 +323,38 @@ class AudioDeal():
 
             # 展示语谱图
             cv2.imshow("images", images)
+            cv2.imshow("bark", bark)
             cv2.waitKey(1)
 
             # if len(wave_datas) > 200:
             #     break
         self.save_wave_file(wave_datas)
 
-    def get_filter_banks(self, filters_num=22, n=2000, samplerate=16000, low_freq=np.finfo(float).eps,
-                         high_freq=None, filter=1):
-        '''计算梅尔三角间距滤波器，该滤波器在第一个频率和第三个频率处为0，在第二个频率处为1
-        参数说明：
-        filers_num:滤波器个数
-        NFFT:FFT大小
-        samplerate:采样频率
-        low_freq:最低频率
-        high_freq:最高频率
-        '''
-        NFFT = 2 * n
-        # 首先，将频率hz转化为梅尔频率，因为人耳分辨声音的大小与频率并非线性正比，所以化为梅尔频率再线性分隔
-        high_freq = high_freq or samplerate / 2  # 计算音频样本的最大频率
-        low_mel = self.hz2bark(low_freq)
-        high_mel = self.hz2bark(high_freq)
-        # 需要在low_mel和high_mel之间等间距插入filters_num个点，一共filters_num+2个点
-        mel_points = np.linspace(low_mel, high_mel, filters_num + 2)
-        # 再将梅尔频率转化为hz频率，并且找到对应的hz位置
-        hz_points = self.bark2hz(mel_points)
-        # 我们现在需要知道这些hz_points对应到fft中的位置
-        bin = np.floor((NFFT + 1) * hz_points / samplerate)
-        # 接下来建立滤波器的表达式了，每个滤波器在第一个点处和第三个点处均为0，中间为三角形形状
-        fbank = np.zeros([filters_num, int(NFFT / 2 + 1)])
+    def get_filter_banks(self, n_fft, n_mels=80, samplerate=None):
+        """
 
-        if filter == 0:  # 转为bark域时使用
-            #############################
-            # 矩形等面积滤波器(平均值滤波) #
-            #############################
-            for j in range(0, filters_num):
-                height = 1 / (int(bin[j + 2]) - int(bin[j]))
-                fbank[j, int(bin[j]):int(bin[j + 2])] = height
-        elif filter == 1:  # 转为spec时使用
-            for j in range(0, filters_num):
-                height = 1 / (int(bin[j + 2]) - int(bin[j]))
-                for i in range(int(bin[j]), int(bin[j + 1])):
-                    fbank[j, i] = (i - bin[j]) / (bin[j + 1] - bin[j]) * height
-                for i in range(int(bin[j + 1]), int(bin[j + 2])):
-                    fbank[j, i] = (bin[j + 2] - i) / (bin[j + 2] - bin[j + 1]) * height
-        return fbank
+        """
+        if samplerate is None:
+            samplerate = self.sampling_rate
+        hz_freq_ruler = np.fft.rfftfreq(n_fft, 1 / samplerate)
+        mel_freq_ruler = self.hz2mel(hz_freq_ruler)
+        fmin = max(hz_freq_ruler.min(), np.finfo(float).eps)
+        fmax = hz_freq_ruler.max()
+        min_mel = self.hz2mel(fmin)
+        max_mel = self.hz2mel(fmax)
 
-    def sepc_to_mel(self, sepc):
-        fbank = self.get_filter_banks(filters_num=22, n=sepc.shape[0], samplerate=self.sampling_rate, low_freq=np.finfo(float).eps,
-                         high_freq=None, filter=0)
-        return
+        mels = np.linspace(min_mel, max_mel, n_mels+2)
+
+        hzs = self.mel2hz(mels)
+        weights = np.zeros((hz_freq_ruler.shape[0], n_mels))
+        for i in range(n_mels):
+            print()
+        return None
+
+    def sepc_to_mel(self, spec):
+        fbank = self.get_filter_banks(n_fft=spec.shape[0], n_mels=80, samplerate=self.sampling_rate)
+        fbank = np.concatenate((fbank.T, np.flip(fbank.T[:-1, :], 0)), axis=0)
+        return np.dot(spec.T, fbank).T
 
     @staticmethod
     def bark2hz(bark):
@@ -382,6 +365,16 @@ class AudioDeal():
     def hz2bark(hz):
         bark = 26.81 / (1 + (1960 / hz)) - 0.53
         return bark
+
+    @staticmethod
+    def hz2mel(hz):
+        mel = 2595*np.log10(1 + hz/700)
+        return mel
+
+    @staticmethod
+    def mel2hz(mel):
+        hz = 700*(10**(mel/2595)-1)
+        return hz
 
 
 if __name__ == '__main__':
