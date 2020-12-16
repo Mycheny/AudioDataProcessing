@@ -389,4 +389,3 @@ if __name__ == '__main__':
     audio_deal.play(frames, winfunc=audio_deal.hanming)
     # audio_deal.play(winfunc=audio_deal.hanming)
     # audio_deal.frames_to_spectrogram(frames)
-    print()
